@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="16dp"
+    tools:context="com.devunitec.epicgas.GasStateActivity">
+
+    <RelativeLayout
+        android:id="@+id/view_found_device"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="invisible">
+
+        <ImageView
+            android:id="@+id/image_found_device"
+            android:layout_width="180dp"
+            android:layout_height="180dp"
+            android:layout_centerInParent="true"
+            android:src="@drawable/image_found_device"/>
+
+        <ProgressBar
+            android:id="@+id/progressBar"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/image_found_device"
+            android:layout_marginTop="16dp"
+            android:layout_centerInParent="true"
+            android:visibility="visible"/>
+
+        <TextView
+            android:id="@+id/tv_found_device"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_alignParentStart="true"
+            android:layout_alignParentTop="true"
+            android:gravity="center"
+            android:text="Found Device..."
+            android:textSize="25sp"
+            android:textStyle="bold" />
+    </RelativeLayout>
+
+    <RelativeLayout
+        android:id="@+id/view_main"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="visible">
+
+        <ImageView
+            android:id="@+id/image_tank_range_five"
+            android:layout_width="310dp"
+            android:layout_height="310dp"
+            android:layout_centerInParent="true"
+            android:background="@drawable/magnitude_circle"
+            android:backgroundTint="#228B22"/>
+
+
+        <ImageView
+            android:id="@+id/image_tank_range_four"
+            android:layout_width="260dp"
+            android:layout_height="260dp"
+            android:layout_centerInParent="true"
+            android:background="@drawable/magnitude_circle"
+            android:backgroundTint="#9ACD32"/>
+
+
+        <ImageView
+            android:id="@+id/image_tank_range_three"
+            android:layout_width="210dp"
+            android:layout_height="210dp"
+            android:layout_centerInParent="true"
+            android:background="@drawable/magnitude_circle"
+            android:backgroundTint="#FFFF00"/>
+
+        <ImageView
+            android:id="@+id/image_tank_range_two"
+            android:layout_width="160dp"
+            android:layout_height="160dp"
+            android:layout_centerInParent="true"
+            android:background="@drawable/magnitude_circle"
+            android:backgroundTint="#FFA500" />
+
+        <ImageView
+            android:id="@+id/image_tank_range_one"
+            android:layout_width="100dp"
+            android:layout_height="100dp"
+            android:layout_centerInParent="true"
+            android:background="@drawable/magnitude_circle"
+            android:backgroundTint="#FF0000" />
+
+        <TextView
+            android:id="@+id/tv_average_tank"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/image_tank_range_one"
+            android:layout_centerInParent="true"
+            android:layout_marginTop="32dp"
+            android:gravity="center"
+            android:text="100%"
+            android:textSize="25sp"
+            android:textStyle="bold" />
+    </RelativeLayout>
+
+    <android.support.design.widget.FloatingActionButton
+        android:id="@+id/fab"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentRight="true"
+        android:layout_margin="15dp"/>
+
+</RelativeLayout>
