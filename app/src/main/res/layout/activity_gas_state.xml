@@ -5,6 +5,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:padding="16dp"
+    android:background="#FFFFFF"
     tools:context="com.devunitec.epicgas.GasStateActivity">
 
     <RelativeLayout
@@ -48,58 +49,45 @@
         android:visibility="visible">
 
         <ImageView
-            android:id="@+id/image_tank_range_five"
-            android:layout_width="310dp"
-            android:layout_height="310dp"
+            android:id="@+id/image_state_tank"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:layout_centerInParent="true"
-            android:background="@drawable/magnitude_circle"
-            android:backgroundTint="#228B22"/>
+            android:src="@drawable/ic_red_low"/>
 
-
-        <ImageView
-            android:id="@+id/image_tank_range_four"
-            android:layout_width="260dp"
-            android:layout_height="260dp"
-            android:layout_centerInParent="true"
-            android:background="@drawable/magnitude_circle"
-            android:backgroundTint="#9ACD32"/>
-
-
-        <ImageView
-            android:id="@+id/image_tank_range_three"
-            android:layout_width="210dp"
-            android:layout_height="210dp"
-            android:layout_centerInParent="true"
-            android:background="@drawable/magnitude_circle"
-            android:backgroundTint="#FFFF00"/>
-
-        <ImageView
-            android:id="@+id/image_tank_range_two"
-            android:layout_width="160dp"
-            android:layout_height="160dp"
-            android:layout_centerInParent="true"
-            android:background="@drawable/magnitude_circle"
-            android:backgroundTint="#FFA500" />
-
-        <ImageView
-            android:id="@+id/image_tank_range_one"
-            android:layout_width="100dp"
-            android:layout_height="100dp"
-            android:layout_centerInParent="true"
-            android:background="@drawable/magnitude_circle"
-            android:backgroundTint="#FF0000" />
-
-        <TextView
-            android:id="@+id/tv_average_tank"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_below="@id/image_tank_range_one"
-            android:layout_centerInParent="true"
-            android:layout_marginTop="32dp"
-            android:gravity="center"
-            android:text="100%"
-            android:textSize="25sp"
-            android:textStyle="bold" />
+            android:orientation="horizontal"
+            android:layout_marginBottom="64dp"
+            android:background="#BDBDBD"
+            android:padding="16dp"
+            android:layout_above="@id/image_state_tank">
+
+            <TextView
+                android:id="@+id/tv_amount_tank"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:text="Medio lleno"
+                android:background="#F5F5F5"
+                android:textSize="25sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tv_amount"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:text="10 Kg"
+                android:layout_marginLeft="10dp"
+                android:background="#F5F5F5"
+                android:textSize="25sp"
+                android:textStyle="bold" />
+
+        </LinearLayout>
     </RelativeLayout>
 
     <android.support.design.widget.FloatingActionButton
@@ -108,6 +96,7 @@
         android:layout_height="wrap_content"
         android:layout_alignParentBottom="true"
         android:layout_alignParentRight="true"
-        android:layout_margin="15dp"/>
+        android:layout_margin="15dp"
+        android:src="@drawable/ic_action_call"/>
 
 </RelativeLayout>
