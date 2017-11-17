@@ -4,7 +4,6 @@ import android.Manifest;
 import android.app.ProgressDialog;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
-import android.bluetooth.BluetoothServerSocket;
 import android.bluetooth.BluetoothSocket;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -15,6 +14,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
+import android.os.ParcelUuid;
 import android.support.annotation.RequiresApi;
 import android.support.design.widget.FloatingActionButton;
 import android.support.v7.app.AppCompatActivity;
@@ -30,7 +30,6 @@ import android.widget.Toast;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.nio.charset.Charset;
 import java.util.UUID;
 
 public class GasStateActivity extends AppCompatActivity {
@@ -40,9 +39,11 @@ public class GasStateActivity extends AppCompatActivity {
     private static final int MESSAGE_READ = 0;
     private final int REQUEST_ENABLE_BT = 1;
 
-    private BluetoothConnectionService mConnectionService;
-    private BluetoothAdapter mBluetoothAdapter;
+    private ConnectedThread mConnectedThread;
+    private BluetoothAdapter mBluetoothAdapter = null;
     private BluetoothDevice mBluetoothDevice;
+    private BluetoothSocket mBluetoothSocket = null;
+
 
     private RelativeLayout viewFoundDevice;
     private TextView foundDeviceTextView;
@@ -51,9 +52,11 @@ public class GasStateActivity extends AppCompatActivity {
     private RelativeLayout viewMain;
     private FloatingActionButton fab;
     private Boolean findDevice = false;
+    private ProgressDialog mProgressDialog;
 
-    private Handler mHandler;
-    private String mDataInput;
+    private Handler bluetoothIn;
+
+    private String inputStreamData;
 
     private final BroadcastReceiver broadcastReceiver = new BroadcastReceiver() {
         @Override
@@ -61,25 +64,48 @@ public class GasStateActivity extends AppCompatActivity {
             String action = intent.getAction();
             if (BluetoothDevice.ACTION_FOUND.equals(action)) {
                 BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-                if (device.getAddress().equals("20:16:10:25:08:15") && device.getName().equals("HC-05")) {
+                if (device.getAddress().equals("00:21:13:01:4F:10")) {
                     findDevice = true;
                     mBluetoothDevice = device;
                 }
             } else if (BluetoothAdapter.ACTION_DISCOVERY_FINISHED.equals(action)) {
                 if (findDevice) {
                     viewFoundDevice.setVisibility(View.GONE);
-                    mConnectionService = new BluetoothConnectionService(GasStateActivity.this);
-                    mConnectionService.startClient(mBluetoothDevice, MODULE_BT_UUID);
+                    // mProgressDialog = ProgressDialog.show(getApplicationContext(), "Connecting Bluetooth", "Please Wait...", true);
                     viewMain.setVisibility(View.VISIBLE);
                     fab.setVisibility(View.VISIBLE);
+                    fab.setImageResource(R.drawable.ic_action_call);
                     fab.setOnClickListener(new View.OnClickListener() {
                         @Override
                         public void onClick(View view) {
-                            String numberCall = "999203922";
+                            String numberCall = "9991532758";
                             Intent intent = new Intent(Intent.ACTION_DIAL);
                             intent.setData(Uri.parse("tel:" + numberCall));
+                            startActivity(intent);
                         }
                     });
+                    if (mBluetoothDevice != null) {
+                        try {
+                            mBluetoothSocket = createBluetoothSocket(mBluetoothDevice);
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+
+                        try {
+                            mBluetoothSocket.connect();
+                        } catch (IOException e) {
+                            try {
+                                mBluetoothSocket.close();
+                            } catch (IOException e1) {
+                                e1.printStackTrace();
+                            }
+                            e.printStackTrace();
+                        }
+                        mConnectedThread = new ConnectedThread(mBluetoothSocket);
+                        mConnectedThread.start();
+                    }
+                    // mProgressDialog.cancel();
+
                 } else {
                     if (viewMain.getVisibility() == View.VISIBLE) {
                         viewMain.setVisibility(View.GONE);
@@ -93,6 +119,7 @@ public class GasStateActivity extends AppCompatActivity {
                         public void onClick(View view) {
                             mBluetoothAdapter.startDiscovery();
                             fab.setVisibility(View.GONE);
+                            progressBar.setVisibility(View.VISIBLE);
                         }
                     });
                 }
@@ -105,6 +132,9 @@ public class GasStateActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_gas_state);
 
+        mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+        checkStateBt(mBluetoothAdapter);
+
         viewFoundDevice = (RelativeLayout) findViewById(R.id.view_found_device);
         foundDeviceTextView = (TextView) findViewById(R.id.tv_found_device);
         progressBar = (ProgressBar) findViewById(R.id.progressBar);
@@ -113,19 +143,16 @@ public class GasStateActivity extends AppCompatActivity {
 
         fab = (FloatingActionButton) findViewById(R.id.fab);
 
-        mHandler = new Handler() {
+        bluetoothIn = new Handler() {
+            @Override
             public void handleMessage(Message msg) {
-                if(msg.what == MESSAGE_READ) {
-                    String readMessage = (String) msg.obj;
-                    Log.i(LOG_TAG, readMessage);
-                    mDataInput = readMessage;
+                if (msg.what == MESSAGE_READ) {
+                    String inputMessage = (String) msg.obj;
+                    Log.e(LOG_TAG, inputMessage);
+                    //Toast.makeText(getBaseContext(), inputMessage, Toast.LENGTH_SHORT).show();
                 }
             }
         };
-
-        mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
-        checkStateBt(this, mBluetoothAdapter);
-
     }
 
     @Override
@@ -142,13 +169,16 @@ public class GasStateActivity extends AppCompatActivity {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 permissionCheck();
             }
-
             if (mBluetoothAdapter.startDiscovery()) {
+                fab.setVisibility(View.GONE);
+                viewMain.setVisibility(View.GONE);
                 viewFoundDevice.setVisibility(View.VISIBLE);
                 foundDeviceTextView.setVisibility(View.VISIBLE);
                 progressBar.setVisibility(View.VISIBLE);
+
             } else {
                 foundDeviceTextView.setText("Error to start discovery device...");
+
             }
         }
 
@@ -156,11 +186,58 @@ public class GasStateActivity extends AppCompatActivity {
         registerReceiver(broadcastReceiver, intentFilter);
     }
 
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        unregisterReceiver(broadcastReceiver);
+    private BluetoothSocket createBluetoothSocket(BluetoothDevice bluetoothDevice) throws IOException {
+        return bluetoothDevice.createRfcommSocketToServiceRecord(bluetoothDevice.getUuids()[0].getUuid());
+    }
 
+    private class ConnectedThread extends Thread {
+        private final InputStream mmInStream;
+        private final OutputStream mmOutStream;
+
+        public ConnectedThread(BluetoothSocket socket) {
+            InputStream tmpIn = null;
+            OutputStream tmpOut = null;
+
+            try {
+                tmpIn = socket.getInputStream();
+                tmpOut = socket.getOutputStream();
+            } catch (IOException e) {
+            }
+
+            mmInStream = tmpIn;
+            mmOutStream = tmpOut;
+        }
+
+        public void run() {
+            byte[] buffer = new byte[256];
+            int bytes;
+
+            // Keep looping to listen for received messages
+            while (true) {
+                try {
+                    bytes = mmInStream.read(buffer);            //read bytes from input buffer
+                    String readMessage = new String(buffer, 0, bytes);
+                    // Send the obtained bytes to the UI Activity via handler
+                    Log.e(LOG_TAG + " 2", buffer.toString());
+                    bluetoothIn.obtainMessage(MESSAGE_READ, bytes, -1, readMessage).sendToTarget();
+                } catch (IOException e) {
+                    break;
+                }
+            }
+        }
+
+        //write method
+        public void write(String input) {
+            byte[] msgBuffer = input.getBytes();           //converts entered String into bytes
+            try {
+                mmOutStream.write(msgBuffer);                //write bytes over BT connection via outstream
+            } catch (IOException e) {
+                //if you cannot write, close the application
+                Toast.makeText(getBaseContext(), "Connection Failure", Toast.LENGTH_LONG).show();
+                finish();
+
+            }
+        }
     }
 
     @Override
@@ -184,6 +261,17 @@ public class GasStateActivity extends AppCompatActivity {
         return super.onOptionsItemSelected(item);
     }
 
+    @Override
+    protected void onPause() {
+        super.onPause();
+        try {
+            mBluetoothSocket.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        unregisterReceiver(broadcastReceiver);
+    }
+
     @RequiresApi(api = Build.VERSION_CODES.M)
     private void permissionCheck() {
         int permissionCheck = this.checkSelfPermission("Manifest.permission.ACCESS_FINE_LOCATION");
@@ -193,243 +281,14 @@ public class GasStateActivity extends AppCompatActivity {
         }
     }
 
-    public class BluetoothConnectionService {
-        private final String LOG_TAG = BluetoothConnectionService.class.getSimpleName();
-        private final String NAME_APP = String.valueOf(R.string.app_name);
-        private final UUID MODULE_BT_UUID = UUID.fromString("2e051fd6-c749-11e7-abc4-cec278b6b50a");
-        private final int MESSAGE_READ = 0;
-        public boolean changeAvail = false;
-
-
-        private final BluetoothAdapter mBluetoothAdapter;
-        private BluetoothDevice mBluetoothDevice;
-        private Context mContext;
-
-        private UUID mDeviceUUID;
-        private AcceptThread mAcceptThread;
-        private ConnectThread mConnectThread;
-        private StreamThread mStreamThread;
-        private ProgressDialog mProgressDialog;
-
-
-        public BluetoothConnectionService(Context context) {
-            this.mContext = context;
-            mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
-            start();
-        }
-
-        public void startClient(BluetoothDevice device, UUID uuid) {
-            mProgressDialog = ProgressDialog.show(mContext, "Connecting Bluetooth"
-                    , "Please Wait...", true);
-
-            mConnectThread = new ConnectThread(device, uuid);
-            mConnectThread.start();
-        }
-
-        private void connected(BluetoothSocket socket, BluetoothDevice device) {
-            Log.d(LOG_TAG, "connected: Starting.");
-            mStreamThread = new StreamThread(socket);
-            mStreamThread.start();
-        }
-
-        private synchronized void start() {
-            Log.d(LOG_TAG, "start");
-
-            if(mConnectThread != null) {
-                mConnectThread.cancel();
-                mConnectThread = null;
-            }
-
-            if(mAcceptThread == null) {
-                mAcceptThread = new AcceptThread();
-                mAcceptThread.start();
-            }
-        }
-
-        public void write(byte[] out) {
-            // Create temporary object
-            StreamThread r;
-
-            // Synchronize a copy of the ConnectedThread
-            Log.d(LOG_TAG, "write: Write Called.");
-            //perform the write
-            mStreamThread.write(out);
-        }
-
-        private class AcceptThread extends Thread{
-            private final BluetoothServerSocket bluetoothServerSocket;
-
-            public AcceptThread() {
-                BluetoothServerSocket tmpSocket = null;
-
-                try {
-                    tmpSocket = mBluetoothAdapter.listenUsingInsecureRfcommWithServiceRecord(NAME_APP, MODULE_BT_UUID);
-                    Log.d(LOG_TAG, "AcceptThread: Setting up Server using: " + MODULE_BT_UUID);
-                } catch (IOException e) {
-                    Log.e(LOG_TAG, "Accept Thread - IOException: " + e.getMessage());
-                    e.printStackTrace();
-                }
-                bluetoothServerSocket = tmpSocket;
-            }
-
-            @Override
-            public void run() {
-                Log.d(LOG_TAG, "run: AcceptThread Running.");
-                BluetoothSocket bluetoothSocket = null;
-
-                try {
-                    Log.d(LOG_TAG, "run: RFCOM server socket start.....");
-                    bluetoothSocket = bluetoothServerSocket.accept();
-                } catch (IOException e) {
-                    Log.e(LOG_TAG, "AcceptThread - IOException: " + e.getMessage());
-                    e.printStackTrace();
-                }
-
-                if(bluetoothSocket != null) {
-                    connected(bluetoothSocket, mBluetoothDevice);
-                }
-                Log.i(LOG_TAG, "end AcceptThread ");
-            }
-
-            public void cancel() {
-                Log.d(LOG_TAG, "cancel: Canceling AcceptThread.");
-                try {
-                    bluetoothServerSocket.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                    Log.e(LOG_TAG, "cancel: Close of AcceptThread ServerSocket failed. " + e.getMessage());
-                }
-            }
-        }
-
-        private class ConnectThread extends Thread {
-            private BluetoothSocket bluetoothSocket;
-
-            public ConnectThread(BluetoothDevice device, UUID uuid) {
-                Log.d(LOG_TAG, "ConnectThread: started.");
-                mBluetoothDevice = device;
-                mDeviceUUID = uuid;
-            }
-
-            @Override
-            public void run() {
-                BluetoothSocket socket = null;
-                Log.i(LOG_TAG, "RUN ConnectThread ");
-
-                try {
-                    Log.d(LOG_TAG, "ConnectThread: Trying to create Socket using UUID: " + mBluetoothDevice.getUuids()[0].getUuid());
-                    socket = mBluetoothDevice.createRfcommSocketToServiceRecord(mBluetoothDevice.getUuids()[0].getUuid());
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-
-                bluetoothSocket = socket;
-                mBluetoothAdapter.cancelDiscovery();
-
-                try {
-                    bluetoothSocket.connect();
-                    Log.d(LOG_TAG, "run: ConnectThread connected.");
-                } catch (IOException e) {
-                    e.printStackTrace();
-                    try {
-                        bluetoothSocket.close();
-                    } catch (IOException e1) {
-                        e1.printStackTrace();
-                        Log.e(LOG_TAG, "mConnectThread: run: Unable to close connection in socket " + e1.getMessage());
-                    }
-                    Log.d(LOG_TAG, "run: ConnectThread: Could not connect to UUID: " + MODULE_BT_UUID);
-                }
-                connected(bluetoothSocket, mBluetoothDevice);
-            }
-
-            public void cancel() {
-                try {
-                    Log.d(LOG_TAG, "cancel: Closing Client Socket.");
-                    bluetoothSocket.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                    Log.e(LOG_TAG, "cancel: close() of Socket in ConnectThread failed. " + e.getMessage());
-                }
-            }
-        }
-
-        private class StreamThread extends Thread {
-            private final BluetoothSocket bluetoothSocket;
-            private final InputStream inputStream;
-            private final OutputStream outputStream;
-
-            public StreamThread(BluetoothSocket bluetoothSocket) {
-                Log.d(LOG_TAG, "StreamThread: Starting.");
-                this.bluetoothSocket = bluetoothSocket;
-                InputStream tmpInputStream = null;
-                OutputStream tmpOutputStream = null;
-
-
-                try {
-                    mProgressDialog.dismiss();
-                } catch (NullPointerException exception) {
-                    exception.printStackTrace();
-                }
-
-                try {
-                    tmpInputStream = bluetoothSocket.getInputStream();
-                    tmpOutputStream = bluetoothSocket.getOutputStream();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-
-                inputStream = tmpInputStream;
-                outputStream = tmpOutputStream;
-            }
-
-            @Override
-            public void run() {
-                byte[] dataByte = new byte[1];
-                int bytes;
-
-                while(true) {
-                    try {
-                        changeAvail = true;
-                        bytes = inputStream.read(dataByte);
-                        String incomingMessage = new String(dataByte, 0, bytes);
-                        mHandler.obtainMessage(MESSAGE_READ, bytes, -1, incomingMessage).sendToTarget();
-
-                        // Log.d(LOG_TAG, "InputStream: " + incomingMessage);
-                    } catch (IOException e) {
-                        changeAvail = false;
-                        Log.e(LOG_TAG, "write: Error reading Input Stream. " + e.getMessage());
-                        break;
-                    }
-                }
-            }
-
-            public void write(byte[] bytes) {
-                String text = new String(bytes, Charset.defaultCharset());
-                Log.d(LOG_TAG, "write: Writing to outputstream: " + text);
-                try {
-                    outputStream.write(bytes);
-                } catch (IOException e) {
-                    Log.e(LOG_TAG, "write: Error writing to output stream. " + e.getMessage());
-                }
-            }
-
-            public void cancel() {
-                try {
-                    bluetoothSocket.close();
-                } catch (IOException e) {
-                }
-            }
-        }
-    }
-
-    public void checkStateBt(AppCompatActivity activity, BluetoothAdapter bluetoothAdapter) {
+    private void checkStateBt(BluetoothAdapter bluetoothAdapter) {
         if (bluetoothAdapter != null) {
             if (!bluetoothAdapter.isEnabled()) {
                 Intent enableIntentBt = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
-                activity.startActivityForResult(enableIntentBt, REQUEST_ENABLE_BT);
+                startActivityForResult(enableIntentBt, REQUEST_ENABLE_BT);
             }
         } else {
-            Toast.makeText(activity.getBaseContext(), "Device does not support bluetooth", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Device does not support bluetooth", Toast.LENGTH_SHORT).show();
         }
     }
 }
